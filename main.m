@@ -33,17 +33,17 @@ vTao = [taoHigh; taoLow];
 rhoTao = 0.7; % s.t. it changes about once every 5 years
 mTranTao = [rhoTao,     1 - rhoTao;...
                     1 - rhoTao,     rhoTao];
+% Ystate = ash_panel(mTranTao,1,100,nTao) % for simulations
 
 cchi = 2; % s.t. workers work about 1/3 of the time, i.e., L=1/3; 
               % some numbers between 1.5 and 2.5 should work;
 
-%% To guess
-wage = 0.1;
+
 
 %% Combine the two shocks into one shock
-mTran_z_tao = kron(mTranZ,mTranTao);
+mTran_z_tao = kron(mTranZ, mTranTao);
 [A1,A2] = meshgrid(vTao,vZ);
-temp=cat(2,A2',A1');
+temp = cat(2,A2',A1');
 mGrid_z_tao=reshape(temp,[],2);
 nShock = nTao * nZ;
 
@@ -68,8 +68,8 @@ f_divident = @(profitAfterTax,invest,costAdjust,p,pPrime,r,ttao)...
 f_bond_limit_upper = @(ddelta,kksi,kPrime)kksi.*(1 - ddelta).*kPrime;
 
 %% Grid for State Variables
-nK = 30; % number of capital points
-nP = 25; % number of bond points
+nK = 20; % number of capital points
+nP = 10; % number of bond points
 
 % kSteadyState = (aalpha .* muZ ./(r + ddelta)).^(1 ./ (1-aalpha))
 kSteadyState = (aalpha .*ttheta .* muZ ./(r + ddelta)).^(1 ./ (1 - aalpha .*ttheta));
@@ -79,7 +79,7 @@ kSpread = 0.9;
 % kMin = 0.0001;
 % kMax = min(2*kSteadyState, kMax); % Tighten the grid
 
-kMax = kSteadyState*(2 + kSpread);
+kMax = kSteadyState*(1 + kSpread);
 kMin = kSteadyState *(1 - kSpread);
 
 % vK = curvspace(kMin,kMax,nK,2)'; % I use curved grid to enhance accuracy
@@ -104,6 +104,12 @@ end
 % end
 
 % mTran_z_tao = kron(mTranZ,mTranTao);
+
+
+
+%% To guess
+wage = 1.6;
+
 
 %% Precompute some values to retrieve
 mLabor = f_labor(aalpha,vK,nnu,ttheta,wage,mGrid_z_tao(:,1)'); % nK by nShock
@@ -296,16 +302,16 @@ zlabel('p policy')
 
 savefig('fig_policy_p')
 
-save result
 
 %% Compute Stationary Distribution
-distributionStationary0 = (1/(nK*nP*nZ*nTao))*ones(nK,nP,nZ,nTao);
+mDist0 = (1/(nK*nP*nTao*nZ))*ones(nK,nP,nTao,nZ);
 distance=100;
-tolerance=1e-9;
+tolerance=1e-5;
 iteration=0;
+maxIter = 1000;
 
-while distance>tolerance
-    distributionStationary1 = zeros(nK,nP,nZ,nTao);
+while distance>tolerance && iteration < maxIter
+    mDist1 = zeros(nK,nP,nTao,nZ);
     for iTao=1:nTao
         for iZ=1:nZ
             iShock = (iZ - 1)*nTao + iTao;
@@ -313,46 +319,116 @@ while distance>tolerance
             for iK=1:nK
 %                 vP = mP(:,iK);
                 
-                for iP=1:nB
+                for iP=1:nP
                 
                     iKPrime = mPolicyIndexK(iK,iP,iShock);          
-                    iPPrime = bPolicyIndex(iK,iP,iShock); 
+                    iPPrime = mPolicyIndexP(iK,iP,iShock); 
 
-                    prob = distributionStationary0(iK,iP,iZ,iTao);
+                    prob = mDist0(iK,iP,iTao,iZ);
                     
                     for iShockPrime=1:nShock
-                        iZPrime = ceil(iShockPrime,nTao);
+                        iZPrime = ceil(iShockPrime/nTao);
                         iTaoPrime = (mod(iShockPrime,nTao)==0)*nTao + (mod(iShockPrime,nTao)~=0)*mod(iShockPrime,nTao);
-                        prob_shockPrime = prob*mTran_z_tao(iShock,iShockPrime)
+                        prob_shockPrime = prob*mTran_z_tao(iShock,iShockPrime);
                         
-                        distributionStationary1(iKPrime,iPPrime,iZPrime,iTaoPrime) = distributionStationary1(iKPrime,iPPrime,iaPrime,iTao) + prob_aPrime;
+                        mDist1(iKPrime,iPPrime,iTaoPrime,iZPrime) = mDist1(iKPrime,iPPrime,iTaoPrime,iZPrime) + prob_shockPrime;
                     end
                     
-                end
-            end
-        end
-    end
+                end % p 
+            end % k
+        end % z
+    end % tao
     
-    distance=sum(sum(sum(sum(abs(distributionStationary0-distributionStationary1)))));
-    distributionStationary0 = distributionStationary1;
+    distance=sum(abs(mDist0-mDist1),'all');
+    mDist0 = mDist1;
     iteration = iteration + 1;
 end
 
-% Plot the distribution
+%% Plot the distribution
 
-figure(10);
-[bb,kk]=meshgrid(grid_b, grid_k);
-mesh(bb, kk, distributionStationary0(:,:,1,1));
-for iZ = 2:Na
-    for iTao = 2:Na
-        hold on
-        mesh(bb, kk, distributionStationary0(:,:,iTao,iZ));
-    end
-end
-title('Stationary Distribution','interpreter','latex');
-ylabel('Capital Stock $k$','interpreter','latex')
-xlabel('Debt $b$','interpreter','latex')
-ylim([min(grid_k),max(grid_k)])
-xlim([min(grid_b),max(grid_b)])
-zlabel('Probability Mass','interpreter','latex')
-savefig('q1d_stationary_distribution_3D')
+% make grid for k and p
+mK = repmat(vK,1,nP)';
+
+figure
+subplot(1,3,1)
+h1=surf(mK,mP,mDist1(:,:,1,1)','EdgeColor', 'black', 'FaceColor', [255,100,0]/255, 'FaceAlpha', .5, 'Marker', '.' );
+hold on
+h2=surf(mK,mP,mDist1(:,:,2,1)','EdgeColor', 'black', 'FaceColor', [1,255,200]/255, 'FaceAlpha', .9, 'Marker', '.');
+% legend([h1, h2], {'high tax', 'low tax'});
+title('low productivity (z)')
+xlabel('k')
+ylabel('p')
+zlabel('prob')
+
+subplot(1,3,2)
+h1=surf(mK,mP,mDist1(:,:,1,2)','EdgeColor', 'black', 'FaceColor', [255,100,0]/255, 'FaceAlpha', .5, 'Marker', '.' );
+hold on
+h2=surf(mK,mP,mDist1(:,:,2,2)','EdgeColor', 'black', 'FaceColor', [1,255,200]/255, 'FaceAlpha', .9, 'Marker', '.');
+legend([h1, h2], {'high tax', 'low tax'},'Location','best');
+title('medium productivity (z)')
+xlabel('k')
+ylabel('p')
+zlabel('prob')
+
+subplot(1,3,3)
+h1=surf(mK,mP,mDist1(:,:,1,3)','EdgeColor', 'black', 'FaceColor', [255,100,0]/255, 'FaceAlpha', .5, 'Marker', '.' );
+hold on
+h2=surf(mK,mP,mDist1(:,:,2,3)','EdgeColor', 'black', 'FaceColor', [1,255,200]/255, 'FaceAlpha', .9, 'Marker', '.');
+% legend([h1, h2], {'high tax', 'low tax'});
+title('high productivity (z)')
+xlabel('k')
+ylabel('p')
+zlabel('prob')
+
+savefig('fig_distribution')
+
+%% Aggregate Labor Demand
+mDist1_3D = reshape(mDist1,nK,nP,nShock);
+
+mDist1_kz = sum(mDist1_3D,[2]);
+mDist1_kz= reshape(mDist1_kz,nK,nShock);
+laborAgg = sum(mLabor.*mDist1_kz,'all');
+
+% mLaborDemand = f_labor(aalpha,vK,nnu,ttheta,wage,vZ'); % nK by nZ
+% mDist1_kz = sum(mDist1,[2 3]);
+% mDist1_kz= reshape(mDist1_kz,nK,nZ);
+% laborAgg = sum(mLaborDemand.*mDist1_kz,'all');
+
+%% Aggregate Bond State
+mDist1_kp = sum(mDist1_3D,[3]);
+pAgg = sum(mP'.*mDist1_kp,'all');
+
+% mDist1_kp = sum(mDist1,[3 4]);
+% pAgg = sum(mP'.*mDist1_kp,'all');
+
+%% Aggregate Bond Demand
+pPrimeAgg = sum(mPolicyP.*mDist1_3D,'all');
+
+assert(abs(pPrimeAgg - pAgg)<1e-5); % bond market clear
+
+%% Aggregate Divident
+mProfitAfterTax_3D = permute(repmat(mProfitAfterTax,1,1,nP),[1 3 2]);
+
+mK_3D = repmat(vK,1,nP,nShock);
+mP_3D = repmat(mP',1,1,nShock);
+% mLabor = f_labor(aalpha,vK,nnu,ttheta,wage,mGrid_z_tao(:,1)'); % nK by nShock
+% mY = f_product(aalpha,vK,mLabor,nnu,ttheta,mGrid_z_tao(:,1)'); % nK by nShock
+% mProfitAfterTax = (1-mGrid_z_tao(:,2)').*(mY - wage.*mLabor); % nK by nShock
+
+% mCostAdjust = f_adjust(ddelta,vK,vK',ppsi); % nK by nK_prime
+% mInvest = f_invest(ddelta,vK,vK'); % nK by nK_prime
+
+mInvest_3D = f_invest(ddelta,mK_3D,mPolicyK);
+mCostAdjust_3D = f_adjust(ddelta,mK_3D,mPolicyK,ppsi);
+mDivident_3D = f_divident(mProfitAfterTax_3D,mInvest_3D,mCostAdjust_3D,mP_3D,mPolicyP,r,ttao); % kPrime by pPrime
+dividentAgg = sum(mDivident_3D.*mDist1_3D,'all');
+
+consumption_1 = r.*pPrimeAgg + wage.*laborAgg + dividentAgg;
+consumption_2 = wage/cchi;
+
+error_consumption = consumption_1 - consumption_2;
+% error_labor = laborAgg - 1/3;
+
+
+save result
+

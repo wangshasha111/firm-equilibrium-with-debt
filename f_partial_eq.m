@@ -1,0 +1,1 @@
+function [error_consumption,] = f_partial_eq(wage,)
