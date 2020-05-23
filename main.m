@@ -2,6 +2,9 @@ clc
 clear;
 close all;
 
+% Difference from the toymodel.pdf
+% \rhoLogZ is 0.9, instead of 0.7 in the document. Otherwise the collateral constraint is always binding
+
 %% Parameterization
 aalpha = 0.3; % capital share
 ttheta = 0.8; % decreasing return technology
@@ -14,7 +17,7 @@ llambda = 0.05; % external financing cost
 r = 0.04; % risk-free interest rate
 
 % Technology Process
-rhoLogZ = 0.8; % correlation of technology AR1 
+rhoLogZ = 0.9; % correlation of technology AR1 
 sigmaLogZ = 0.2; % standard deviation of technology AR1
 nZ = 3;
 muZ = 1;
@@ -107,9 +110,24 @@ end
 
 
 
-%% To guess
-% I plot the error (marginal utility minus marginal labor) against wage and
-% see the former goes up with the latter
+%% To guess Wage to get equilibrium
+
+
+% Strategy
+% According to the utility function of the consumer, 
+% marginal disutility of labor is cchi,
+% marginal utility of consumption is wage/(p*(1+r) + wage*L - p' + E(.)),
+% where p islast period's saving for this period, p' is this period's
+% saving for next period, and E(.) is divident.
+% I solve the firm's problem and computed the p, p', labor, E(.) on the
+% aggregate level, and plug it into the MU of consumption wage/(p*(1+r) +
+% wage*L - p' + E(.))
+% Then I play around with wage to get the marginal (dis)utilities equal.
+
+% I plotted the error (marginal utility minus marginal labor) against wage and
+% see the former goes up with the latter.
+
+% So I use bisection method to find wage.
 
 % wage = 1.6;
 % wage_min = 1.59;
@@ -294,7 +312,7 @@ while abs(error) > tol && ITER < maxIteration
 %% Aggregate Bond Demand
     pPrimeAgg = sum(mPolicyP.*mDist1,'all');
 
-    assert(abs(pPrimeAgg - pAgg)<1e-5); % bond market clear
+    assert(abs(pPrimeAgg - pAgg)<1e-4); % bond market clear
 
 %% Aggregate Divident
     mProfitAfterTax_3D = permute(repmat(mProfitAfterTax,1,1,nP),[1 3 2]);
@@ -342,6 +360,7 @@ end
 
 if abs(error)<=tol 
     display("Equilibrium wage found. Wage = "+num2str(wage)+". Error = "+ num2str(error))
+    display("Labor Demand/Supply = "+num2str(laborAgg));
 else
     display("Equilibrium wage not found.")
 end
