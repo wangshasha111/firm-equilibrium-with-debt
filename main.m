@@ -117,10 +117,10 @@ end
 % According to the utility function of the consumer, 
 % marginal disutility of labor is cchi,
 % marginal utility of consumption is wage/(p*(1+r) + wage*L - p' + E(.)),
-% where p islast period's saving for this period, p' is this period's
+% where p is last period's saving for this period, p' is this period's
 % saving for next period, and E(.) is divident.
 % I solve the firm's problem and computed the p, p', labor, E(.) on the
-% aggregate level, and plug it into the MU of consumption wage/(p*(1+r) +
+% aggregate level, and plug them into the MU of consumption wage/(p*(1+r) +
 % wage*L - p' + E(.))
 % Then I play around with wage to get the marginal (dis)utilities equal.
 
@@ -173,7 +173,7 @@ while abs(error) > tol && ITER < maxIteration
     distance = 10;
     tolerance = 1e-5;
     
-    if ITER == 1
+    if ITER == 1 % cold guess for the first iteration, hot guess for thereafter
         mValue0 = repmat(mProfitAfterTax * (1 + 1/r),1,1,nP);
         mValue0 = permute(mValue0,[1,3,2]);
         % mValue0 = zeros(nK,nP,nShock);
