@@ -1,4 +1,4 @@
-# firm_equilibrium_with_debt
+# How Do Firms Operate under Debt Constraints?
 
 ## Goals
 This project is a structural model for the company's investment decisions with debt. The description is written in [toymodel.pdf](https://github.com/wangshasha111/firm_equilibrium_with_debt/blob/master/toymodel.pdf).
